@@ -8,6 +8,14 @@ from importlib import import_module
 _t = import_module("30_translate") if False else None
 
 
+def load_extra(d):
+    """Per-video optional extras: {"title_tag": "...", "note": "..."}"""
+    p = d / "extra.json"
+    if p.exists():
+        return json.loads(p.read_text(encoding="utf-8"))
+    return {}
+
+
 def call(base, key, model, messages):
     import urllib.request
     body = {"model": model, "messages": messages, "temperature": 0.6, "max_tokens": 2000}
@@ -47,12 +55,16 @@ def build(video_id):
         m = re.search(r"\{.*\}", raw, re.S)
         obj = json.loads(m.group(0))
 
+    extra = load_extra(d)
     obj["source_url"] = meta.get("webpage_url", "")
     obj["source_channel"] = meta.get("uploader", "")
 
     # 简介尾部固定追加：机翻声明 + 来源。不交给模型写，保证每期都一致。
     body = (obj.get("desc") or "").strip()
+    note = (extra.get("note") or "").strip()
+    note_block = f"\n\n{note}" if note else ""
     footer = (
+        note_block +
         "\n\n"
         "⚠️ 本视频字幕由 AI 机器翻译，可能存在错译或术语不准，"
         "欢迎在评论区指正，会持续修正。\n"
@@ -65,7 +77,9 @@ def build(video_id):
     for tag in ("【搬运】", "【自用】"):
         if base_title.startswith(tag):
             base_title = base_title[len(tag):].lstrip()
-    obj["title"] = "【搬运】【自用】" + base_title
+    tag = (extra.get("title_tag") or "").strip().strip("【】")
+    tag_part = f"【{tag}】" if tag else ""
+    obj["title"] = "【搬运】【自用】" + tag_part + base_title
     (d / "bili.json").write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
     log(f"[meta] {obj.get('title')}")
 
