@@ -1,0 +1,29 @@
+{
+  "provider": {
+    "api_base": "@from_alma",
+    "api_key": "@from_alma",
+    "model": "workbuddy/deepseek-v4.1-flash"
+  },
+  "whisper": {
+    "model": "mlx-community/whisper-large-v3-mlx",
+    "language": "en"
+  },
+  "download": {
+    "format": "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080]/b",
+    "write_auto_subs": true,
+    "sub_langs": "en.*,en"
+  },
+  "subtitle": {
+    "max_line_width": 26,
+    "max_line_count": 2,
+    "font": "PingFang SC",
+    "font_size": 44,
+    "zh_color": "&H00FFFFFF",
+    "en_color": "&H00D0D0D0"
+  },
+  "render": {
+    "crf": 20,
+    "preset": "medium",
+    "audio_bitrate": "192k"
+  }
+}

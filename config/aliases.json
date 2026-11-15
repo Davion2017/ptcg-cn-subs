@@ -1,0 +1,33 @@
+{
+  "_comment": "ASR 常听错的卡名 → 正确英文名。键是错误写法，值对应 glossary.json 里的正确词条。",
+
+  "Bidou": "Budew",
+  "Bidoof": "Budew",
+  "Boohoo": "Budew",
+  "Buddha": "Budew",
+
+  "Fennel": "Fennel",
+  "Elgium": "Elgyem",
+  "Elgyum": "Elgyem",
+  "L-G-M": "Elgyem",
+  "Crocodile": "Krookodile",
+  "Kobold": "Krookodile",
+
+  "Kobalion": "Cobalion",
+  "Cobalian": "Cobalion",
+
+  "Goldango": "Gholdengo",
+  "Golden Go": "Gholdengo",
+  "Goldengo": "Gholdengo",
+
+  "Zerosic": "Zoroark",
+  "Mute EX": "Mew ex",
+  "Mute": "Mew",
+  "Drayga": "Dragapult",
+  "Drago Pult": "Dragapult",
+
+  "Wugtrio": "Wugtrio",
+  "Wug Trio": "Wugtrio",
+  "Archaludon": "Archaludon",
+  "Archaludon ex": "Archaludon ex"
+}

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 凭据：不要提交
+config/bili_cookies.json
+config/bili_qrcode.png
+
+# 媒体产物
+data/jobs/
+data/output/
