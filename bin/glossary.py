@@ -6,11 +6,21 @@ from common import CONFIG
 
 _cache = {}
 
+_APOS = {"\u2019": "'", "\u2018": "'", "\u00b4": "'", "\u02bc": "'"}
+
+
+def norm(text):
+    """Normalise typographic apostrophes so lookups don't silently miss."""
+    for bad, good in _APOS.items():
+        text = text.replace(bad, good)
+    return text
+
 
 def load():
     if "g" not in _cache:
         p = CONFIG / "glossary.json"
-        _cache["g"] = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        raw = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        _cache["g"] = {norm(k): v for k, v in raw.items() if not k.startswith("_")}
     return _cache["g"]
 
 
@@ -19,7 +29,7 @@ def load_aliases():
     if "a" not in _cache:
         p = CONFIG / "aliases.json"
         raw = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
-        _cache["a"] = {k: v for k, v in raw.items() if not k.startswith("_")}
+        _cache["a"] = {norm(k): v for k, v in raw.items() if not k.startswith("_")}
     return _cache["a"]
 
 
@@ -41,7 +51,7 @@ def _keys():
 
 def exact_terms(text):
     """Return glossary terms literally present in text (longest first)."""
-    text = apply_aliases(text)
+    text = apply_aliases(norm(text))
     found = []
     low = text.lower()
     for k in _keys():
@@ -54,7 +64,7 @@ def exact_terms(text):
 
 def fuzzy_terms(text, cutoff=0.78):
     """Catch ASR-mangled card names: capitalised words/likely proper nouns."""
-    text = apply_aliases(text)
+    text = apply_aliases(norm(text))
     g = load()
     out = []
     # candidate tokens: capitalised words, or short multiword phrases

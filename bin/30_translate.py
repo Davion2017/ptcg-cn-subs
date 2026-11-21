@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (load_settings, job_dir, log, read_srt, write_srt,
                     provider_credentials, CONFIG)
 import glossary as gl_mod
+import chs as chs_mod
+import chs_verify
 
 BATCH = 25          # cues per request
 OVERLAP = 4         # cues of context carried into the next batch
@@ -114,6 +116,18 @@ def translate(video_id, force=False):
     glossary = load_glossary()
     log(f"[translate] {len(cues)} cues, model={model}, glossary={len(glossary)}")
 
+    # Authoritative names for the deck this video actually plays, straight from
+    # the official CN dataset. These win over anything in the hand glossary.
+    deck = {}
+    meta_p = d / "meta.json"
+    if meta_p.exists() and chs_mod.available():
+        try:
+            meta = json.loads(meta_p.read_text(encoding="utf-8"))
+            deck = chs_verify.resolve(meta.get("description") or "")
+        except Exception as e:
+            log(f"[translate] chs deck lookup failed: {e}")
+    log(f"[translate] official CN names for this deck: {len(deck)}")
+
     results = {}
     i = 0
     while i < len(cues):
@@ -146,9 +160,11 @@ def translate(video_id, force=False):
             user.append("语音识别纠错（原文已按正确卡名改写，请照此翻译）：")
             user.extend(alias_hits)
             user.append("")
-        if terms:
-            user.append("题库（term = 中文，必须遵守；含拼写近似词）：")
-            user.append("\n".join(f"{k} = {v}" for k, v in sorted(terms.items())))
+        merged_terms = dict(terms)
+        merged_terms.update(deck)          # official CN names win
+        if merged_terms:
+            user.append("题库（term = 中文官方译名，必须逐条遵守；含拼写近似词）：")
+            user.append("\n".join(f"{k} = {v}" for k, v in sorted(merged_terms.items())))
             user.append("")
         else:
             user.append("本段没有检测到卡名；若有英文专名请按规则 3 处理。")

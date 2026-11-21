@@ -10,3 +10,9 @@ config/bili_qrcode.png
 # 媒体产物
 data/jobs/
 data/output/
+
+# 简中卡牌数据集原件（27MB，可重新下载）
+data/chs/ptcg_chs_infos.json
+
+# 运行日志
+data/logs/
