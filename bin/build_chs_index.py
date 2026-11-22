@@ -23,6 +23,11 @@ ROOT = Path(__file__).resolve().parent.parent
 CHS = ROOT / "data" / "chs"
 OUT = CHS / "chs_index.json"
 
+# Simplified-Chinese Standard format is G-onwards (亘古开来 was the first G-mark
+# set; A-F have rotated out). Keeping only legal marks halves the name pool the
+# model has to pick from and stops it choosing an old-format name variant.
+LEGAL_MARKS = {"G", "H", "I", "J"}
+
 # English set code used in decklists -> tcgdex set id
 SETMAP = {
     "SVI": "sv01", "PAL": "sv02", "OBF": "sv03", "MEW": "sv03.5",
@@ -53,6 +58,8 @@ def load_cn():
         for k in coll.get("cards", []):
             name = (k.get("name") or "").strip()
             det = k.get("details") or {}
+            if det.get("regulationMarkText") not in LEGAL_MARKS:
+                continue
             if name:
                 cards.add(name)
             if det.get("cardTypeText") == "宝可梦":
@@ -66,10 +73,9 @@ def load_cn():
                 n = (a.get("abilityName") or "").strip()
                 if n and n != "none":
                     moves.add(n)
-            if code_ok := True:
-                code = k.get("commodityCode") or coll.get("commodityCode")
-                if code and name:
-                    set_cn.setdefault(code, []).append(name)
+            code = k.get("commodityCode") or coll.get("commodityCode")
+            if code and name:
+                set_cn.setdefault(code, []).append(name)
             if str(det.get("pokedexCode") or "").isdigit() and name:
                 dex_cands.setdefault(str(int(det["pokedexCode"])), set()).add(name)
             for f in det.get("cardFeatureItemList") or []:
