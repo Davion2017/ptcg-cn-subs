@@ -12,6 +12,29 @@ def load_settings():
     return json.loads((CONFIG / "settings.json").read_text(encoding="utf-8"))
 
 
+def model_backend():
+    """Describe how to reach the translation model.
+
+    settings.provider.mode:
+      "cloud" (default) -> the Alma app's provider, OpenAI-compatible endpoint
+      "local"           -> an Ollama server, /api/chat, thinking disabled
+    """
+    s = load_settings()
+    prov = s.get("provider", {})
+    mode = (prov.get("mode") or "cloud").lower()
+    if mode == "local":
+        loc = prov.get("local") or {}
+        return {
+            "mode": "local",
+            "base": (loc.get("base") or "http://localhost:11434").rstrip("/"),
+            "model": loc.get("model") or "qwen3.5:9b",
+            "key": "",
+            "num_ctx": loc.get("num_ctx") or 32768,
+        }
+    base, key = provider_credentials()
+    return {"mode": "cloud", "base": base, "model": prov["model"], "key": key}
+
+
 def provider_credentials():
     """Read provider endpoint/key from the running Alma app."""
     with urllib.request.urlopen("http://localhost:23001/api/providers", timeout=20) as r:

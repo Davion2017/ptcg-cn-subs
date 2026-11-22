@@ -8,7 +8,7 @@ import json, re, sys, time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (load_settings, job_dir, log, read_srt, write_srt,
-                    provider_credentials, CONFIG)
+                    provider_credentials, model_backend, CONFIG)
 import glossary as gl_mod
 import chs as chs_mod
 import chs_verify
@@ -44,25 +44,46 @@ def load_glossary():
     return gl_mod.load()
 
 
-def call_model(base, key, model, messages, retries=3):
+def call_model(backend, messages, json_mode=True, retries=3):
+    """Send one chat request to whatever backend is configured.
+
+    Cloud = OpenAI-compatible /chat/completions with response_format json_object.
+    Local = Ollama /api/chat with think=false (qwen3.5 thinks by default, which
+    both wastes the context and breaks the JSON-only contract) and no structured
+    output, because this Ollama build rejects `format` with the MLX runner.
+    """
     import urllib.request
-    body = {"model": model, "messages": messages,
-            "temperature": 0.1, "max_tokens": 16000,
-            "response_format": {"type": "json_object"}}
+    if backend["mode"] == "local":
+        body = {"model": backend["model"], "messages": messages,
+                "stream": False, "think": False,
+                "options": {"temperature": 0.1, "num_predict": 16000}}
+        if backend.get("num_ctx"):
+            body["options"]["num_ctx"] = backend["num_ctx"]
+        url = backend["base"] + "/api/chat"
+        headers = {"Content-Type": "application/json"}
+    else:
+        body = {"model": backend["model"], "messages": messages,
+                "temperature": 0.1, "max_tokens": 16000}
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
+        url = backend["base"] + "/chat/completions"
+        headers = {"Content-Type": "application/json",
+                   "Authorization": "Bearer " + backend["key"]}
+
     data = json.dumps(body).encode()
     last = None
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(
-                base + "/chat/completions", data=data,
-                headers={"Content-Type": "application/json",
-                         "Authorization": "Bearer " + key})
-            with urllib.request.urlopen(req, timeout=180) as r:
+            req = urllib.request.Request(url, data=data, headers=headers)
+            with urllib.request.urlopen(req, timeout=900) as r:
                 resp = json.load(r)
+            if backend["mode"] == "local":
+                return resp["message"]["content"]
             return resp["choices"][0]["message"]["content"]
         except Exception as e:
             last = e
-            time.sleep(2 * (attempt + 1))
+            import time as _t
+            _t.sleep(2 * (attempt + 1))
     raise RuntimeError(f"model call failed: {last}")
 
 
@@ -111,10 +132,11 @@ def translate(video_id, force=False):
         log("[translate] exists, use --force to redo")
         return out
 
-    base, key = provider_credentials()
-    model = s["provider"]["model"]
+    backend = model_backend()
+    model = backend["model"]
     glossary = load_glossary()
-    log(f"[translate] {len(cues)} cues, model={model}, glossary={len(glossary)}")
+    log(f"[translate] {len(cues)} cues, model={model} ({backend['mode']}), "
+        f"glossary={len(glossary)}")
 
     # Authoritative names for the deck this video actually plays, straight from
     # the official CN dataset. These win over anything in the hand glossary.
@@ -173,7 +195,7 @@ def translate(video_id, force=False):
         user.append(json.dumps({"lines": payload}, ensure_ascii=False))
 
         try:
-            raw = call_model(base, key, model,
+            raw = call_model(backend,
                              [{"role": "system", "content": SYSTEM},
                               {"role": "user", "content": "\n".join(user)}])
             obj = parse_json(raw)
@@ -182,7 +204,7 @@ def translate(video_id, force=False):
             sub_ok = 0
             for c in batch:
                 try:
-                    r2 = call_model(base, key, model,
+                    r2 = call_model(backend,
                                     [{"role": "system", "content": SYSTEM},
                                      {"role": "user", "content":
                                       f"题库片段：\n" + "\n".join(f"{k} = {v}" for k, v in sorted(terms.items())[:40]) +

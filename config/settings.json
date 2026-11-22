@@ -1,8 +1,15 @@
 {
   "provider": {
+    "mode": "cloud",
     "api_base": "@from_alma",
     "api_key": "@from_alma",
-    "model": "workbuddy/deepseek-v4.1-flash"
+    "model": "workbuddy/deepseek-v4.1-flash",
+    "num_ctx": 32768,
+    "local": {
+      "base": "http://localhost:11434",
+      "model": "qwen3.5:9b",
+      "num_ctx": 32768
+    }
   },
   "whisper": {
     "model": "mlx-community/whisper-large-v3-mlx",

@@ -10,7 +10,7 @@ invents is rejected. Results are cached in config/chs_verified.json.
 import json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import CONFIG, provider_credentials, load_settings, log
+from common import CONFIG, provider_credentials, load_settings, log, model_backend
 import chs
 
 CACHE = CONFIG / "chs_verified.json"
@@ -37,7 +37,7 @@ def _save(c):
                      encoding="utf-8")
 
 
-def _ask(base, key, model, en, pool_sorted):
+def _ask(backend, en, pool_sorted):
     import urllib.request
     listing = "、".join(pool_sorted)
     sys_prompt = ("你是宝可梦卡牌（PTCG）简中官方译名词典。"
@@ -46,15 +46,29 @@ def _ask(base, key, model, en, pool_sorted):
     user = (f"名单（官方简体中文卡名）：\n{listing}\n\n"
             f"英文卡名：{en}\n"
             f"请只输出名单里与它对应的那一个名字，不要解释。")
-    body = {"model": model, "temperature": 0,
-            "messages": [{"role": "system", "content": sys_prompt},
-                         {"role": "user", "content": user}]}
-    req = urllib.request.Request(
-        base + "/chat/completions", data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + key})
-    with urllib.request.urlopen(req, timeout=180) as r:
+    messages = [{"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user}]
+
+    if backend["mode"] == "local":
+        body = {"model": backend["model"], "messages": messages,
+                "stream": False, "think": False,
+                "options": {"temperature": 0, "num_predict": 200}}
+        if backend.get("num_ctx"):
+            body["options"]["num_ctx"] = backend["num_ctx"]
+        url = backend["base"] + "/api/chat"
+        headers = {"Content-Type": "application/json"}
+    else:
+        body = {"model": backend["model"], "temperature": 0, "messages": messages}
+        url = backend["base"] + "/chat/completions"
+        headers = {"Content-Type": "application/json",
+                   "Authorization": "Bearer " + backend["key"]}
+
+    req = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                 headers=headers)
+    with urllib.request.urlopen(req, timeout=300) as r:
         resp = json.load(r)
+    if backend["mode"] == "local":
+        return (resp["message"]["content"] or "").strip()
     return (resp["choices"][0]["message"]["content"] or "").strip()
 
 
@@ -89,12 +103,11 @@ def resolve(description, force=False):
             unverified = retry + [en for en in unverified if en not in cache]
 
     if unverified:
-        base, key = provider_credentials()
-        model = load_settings()["provider"]["model"]
+        backend = model_backend()
         resolved, rejected = 0, []
         for en in unverified:
             try:
-                ans = _ask(base, key, model, en, pool_sorted)
+                ans = _ask(backend, en, pool_sorted)
             except Exception as e:
                 log(f"[chs] {en}: model call failed ({e})")
                 continue

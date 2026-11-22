@@ -271,3 +271,31 @@ TITLE_PREFIX = "【搬运】【自用】"
 - [ ] `glossary.json` 补全到黑白版全卡池的卡牌道具名（现在道具名只有几十条）
 - [ ] 支持定时/队列，一次提交多条
 - [ ] 大文件上传时调低分片并发（57 分片的 567MB 视频有 6 个分片 SSL 报错，靠重试补上）
+
+## 翻译模型：云端 / 本地切换
+
+流水线默认用 Alma 的云端 provider 翻译，也可以改成本地 Ollama。
+
+```bash
+python bin/use_local.py            # 看当前用哪个后端，本地模式会顺带列 Ollama 里的模型
+python bin/use_local.py local      # 切本地（config/settings.json 里 provider.mode = "local"）
+python bin/use_local.py cloud      # 切回云端
+```
+
+本地模式的几个细节：
+
+- 走 Ollama 的 `/api/chat`，不是 OpenAI 兼容接口。
+- **必须传 `think: false`**：qwen3.5 默认开思考，会把上下文耗在思考上并破坏 JSON 输出契约。
+- 不发 `format: json`：当前这版 Ollama 的 MLX runner 会直接返回 `501 structured output is unavailable`，
+  所以 JSON 只能靠提示词约束，`parse_json()` 里有容错（能从句中被截断的结果里抢救完整的行）。
+- `num_ctx` 默认 32768，批量 25 条字幕加题库够用。
+
+`config/settings.json` 结构：
+
+```json
+"provider": {
+  "mode": "cloud",
+  "model": "workbuddy/deepseek-v4.1-flash",
+  "local": { "base": "http://localhost:11434", "model": "qwen3.5:9b", "num_ctx": 32768 }
+}
+```
