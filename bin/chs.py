@@ -72,6 +72,17 @@ def load():
         for n in allnames:
             if n != stem and n.startswith(stem) and n not in lst:
                 lst.append(n)
+    # lowercase EN name -> dex, tolerant of a missing/bogus "ex" suffix
+    en2dex = {}
+    for d, rec in idx.get("dex", {}).items():
+        en = (rec.get("en") or "").strip().lower()
+        if not en:
+            continue
+        en2dex.setdefault(en, d)
+        base = re.sub(r"\s+ex$", "", en)
+        en2dex.setdefault(base, d)
+        en2dex.setdefault(base + " ex", d)
+    idx["_en2dex"] = en2dex
     # dex -> {name: type text}
     if "dex_names" not in idx:
         idx["dex_names"] = {k: v for k, v in idx.get("dex", {}).items()}
@@ -129,17 +140,17 @@ def official_name(en, code, num, idx=None):
     local = str(num).zfill(3)
     if not (has_qualifier or has_owner):
         if cards.get(local) and cards[local].lower() == en.lower():
+            # The printing matches, but en_to_zh came from the shortest name
+            # of the species, which loses the "ex" suffix. Re-score candidates.
+            dex0 = idx.get("_en2dex", {}).get(en.strip().lower())
+            cands0 = idx.get("dex_candidates", {}).get(dex0 or "", [])
+            if cands0:
+                return max(cands0, key=lambda c: _score(en, c))
             zh = idx.get("en_to_zh", {}).get(en)
             if zh:
                 return zh
     # 2) dex candidates, scored
-    dex = None
-    for d, rec in idx.get("dex", {}).items():
-        if rec.get("en", "").lower() == en.lower():
-            dex = d
-            break
-    if dex is None and sid and local:
-        pass
+    dex = idx.get("_en2dex", {}).get(en.strip().lower())
     cands = idx.get("dex_candidates", {}).get(dex or "", [])
     if cands:
         best = max(cands, key=lambda c: _score(en, c))

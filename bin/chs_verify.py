@@ -80,6 +80,14 @@ def resolve(description, force=False):
             continue
         unverified.append(en)
 
+    # A cached None means "the model couldn't find it", not "there is no name".
+    # Re-ask when the dex path has since started resolving it, which happens
+    # after fixes to chs.py; otherwise stale negative cache hides the answer.
+    if unverified and not force:
+        retry = [en for en in unverified if en in cache and cache[en] is None]
+        if retry:
+            unverified = retry + [en for en in unverified if en not in cache]
+
     if unverified:
         base, key = provider_credentials()
         model = load_settings()["provider"]["model"]
