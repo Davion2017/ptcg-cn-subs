@@ -28,6 +28,10 @@ STAGES = [
     ("30", "30_translate.py"),
     ("35", "35_cleanup.py"),
     ("40", "40_bilingual.py"),
+    # 45 reviews the subtitle and refuses to continue while it still has
+    # untranslated text. Burning subtitles is the single expensive stage, so
+    # nothing may be rendered until the text is confirmed clean.
+    ("45", "45_review.py"),
     ("50", "50_render.py"),
     ("60", "60_meta.py"),
     ("70", "70_upload.py"),
