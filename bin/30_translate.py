@@ -145,7 +145,7 @@ def translate(video_id, force=False):
     if meta_p.exists() and chs_mod.available():
         try:
             meta = json.loads(meta_p.read_text(encoding="utf-8"))
-            deck = chs_verify.resolve(meta.get("description") or "")
+            deck = chs_verify.resolve_for(video_id)
         except Exception as e:
             log(f"[translate] chs deck lookup failed: {e}")
     log(f"[translate] official CN names for this deck: {len(deck)}")
@@ -227,6 +227,30 @@ def translate(video_id, force=False):
                 continue
         log(f"[translate] {min(i + BATCH, len(cues))}/{len(cues)}")
         i += BATCH
+
+    # The model sometimes drops lines from a batch; those cues would otherwise
+    # ship as raw English. Re-ask for just the missing ones.
+    gaps = [c for c in cues if not results.get(c["index"])]
+    if gaps:
+        log(f"[translate] {len(gaps)} cues came back untranslated; asking again")
+        fixed = 0
+        for c in gaps:
+            try:
+                r2 = call_model(backend,
+                                [{"role": "system", "content": SYSTEM},
+                                 {"role": "user", "content":
+                                  "题库片段：\n" + "\n".join(f"{k} = {v}" for k, v in sorted(deck.items())[:40]) +
+                                  "\n\n请翻译这一条，输出 JSON：\n" +
+                                  json.dumps({"lines": [{"i": c["index"],
+                                             "en": c["text"].replace(chr(10), " ")}]}, ensure_ascii=False)}])
+                for item in parse_json(r2).get("lines", []):
+                    zh = str(item.get("zh") or "").strip()
+                    if zh:
+                        results[int(item["i"])] = zh
+                        fixed += 1
+            except Exception as e:
+                log(f"[translate]   cue {c['index']} still failed: {e}")
+        log(f"[translate] gap pass filled {fixed}/{len(gaps)}")
 
     merged = []
     for c in cues:

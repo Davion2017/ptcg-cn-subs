@@ -40,8 +40,7 @@ def video_deck_terms(video_id):
         meta = json.loads(meta_p.read_text(encoding="utf-8"))
     except Exception:
         return {}
-    desc = meta.get("description") or ""
-    return chs_verify.resolve(desc)
+    return chs_verify.resolve_for(video_id)
 
 
 def run_cleanup(video_id):

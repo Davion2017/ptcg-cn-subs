@@ -137,3 +137,47 @@ if __name__ == "__main__":
     for en, zh in sorted(terms.items()):
         print(f"  {en:<34} -> {zh}")
     print(f"\n{len(terms)} resolved")
+
+
+def deck_text(video_id):
+    """Decklist source for a job: the description, or a manually transcribed
+    <job>/decklist.txt when the video only shows its deck on screen."""
+    from common import job_dir
+    d = job_dir(video_id)
+    meta_p = d / "meta.json"
+    desc = ""
+    if meta_p.exists():
+        try:
+            desc = json.loads(meta_p.read_text(encoding="utf-8")).get("description") or ""
+        except Exception:
+            desc = ""
+    if chs.deck_lines(desc):
+        return desc
+    p = d / "decklist.txt"
+    if p.exists():
+        return p.read_text(encoding="utf-8")
+    return desc
+
+
+def deck_overrides(video_id):
+    """Per-job EN -> CN name sheet for cards the CN set hasn't printed yet
+    (or whose official CN name differs from the dataset's guess).
+
+    Kept in <job>/deck_zh.json so an unreleased set can still get consistent
+    names across the whole subtitle.
+    """
+    from common import job_dir
+    p = job_dir(video_id) / "deck_zh.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            log(f"[chs] deck_zh.json unreadable: {e}")
+    return {}
+
+
+def resolve_for(video_id, force=False):
+    """Verified CN names for this job's deck, with per-job overrides on top."""
+    terms = resolve(deck_text(video_id), force=force)
+    terms.update(deck_overrides(video_id))
+    return terms

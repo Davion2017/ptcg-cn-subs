@@ -193,8 +193,19 @@ def near_miss(text, official, max_diff=None):
     if not official:
         return []
     runs = re.findall(r"[\u4e00-\u9fff]{3,}", text)
+    official_set = set(official)
     fixes = set()
     for run in runs:
+        # Spans already occupied by a *longer* correct official name must not be
+        # rewritten. 黑夜魔灵 must not be "corrected" through its 夜魔灵 tail,
+        # and 拉帝亚斯 must not be swapped for 拉帝欧斯 just because both are
+        # official and one character apart.
+        protect = []
+        for off in official:
+            start = run.find(off)
+            while start != -1:
+                protect.append((start, start + len(off)))
+                start = run.find(off, start + 1)
         for off in official:
             n = len(off)
             if n > len(run):
@@ -202,9 +213,12 @@ def near_miss(text, official, max_diff=None):
             allowed = max_diff if max_diff is not None else (1 if n <= 5 else 2)
             for i in range(0, len(run) - n + 1):
                 win = run[i:i + n]
-                if win == off:
+                if win == off or win in official_set:
                     continue
                 if win[0] != off[0] or win[-1] != off[-1]:
+                    continue
+                # inside a longer official name -> already right
+                if any(a <= i and i + n <= b and (b - a) > n for a, b in protect):
                     continue
                 diff = sum(1 for a, b in zip(win, off) if a != b)
                 if 0 < diff <= allowed:

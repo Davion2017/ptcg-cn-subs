@@ -16,9 +16,9 @@ import chs_verify
 def cmd_deck(video_id):
     d = job_dir(video_id)
     meta = json.loads((d / "meta.json").read_text(encoding="utf-8"))
-    desc = meta.get("description") or ""
+    desc = chs_verify.deck_text(video_id)
     lines = chs.deck_lines(desc)
-    resolved = chs_verify.resolve(desc)
+    resolved = chs_verify.resolve_for(video_id)
     print(f"{meta.get('title')}\n{len(lines)} cards in decklist\n")
     missing = []
     for e in lines:
@@ -38,7 +38,7 @@ def cmd_check(video_id):
     # Full deck for the video: dex join plus the verified trainer/energy names.
     # chs.deck_terms alone only covers Pokémon, so a check built on it reports
     # 0 drift while the subtitle is full of wrong trainer names.
-    deck = chs_verify.resolve(meta.get("description") or "")
+    deck = chs_verify.resolve_for(video_id)
     official = sorted(set(deck.values()))
     srt = d / "zh.clean.srt"
     if not srt.exists():
